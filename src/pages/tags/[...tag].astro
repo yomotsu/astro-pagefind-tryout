@@ -1,0 +1,53 @@
+---
+import { getCollection } from 'astro:content';
+import Layout from "../../layouts/Layout.astro";
+
+export async function getStaticPaths() {
+
+  const blogEntries = await getCollection('blog');
+	const rawBlogEntries = await Astro.glob("../../content/blog/**/*.mdx");
+	const tags = [...new Set(blogEntries.map((entry) => entry.data.tags).flat())];
+
+	const imageLookup = blogEntries.reduce( ( acc, entry ) => {
+
+		// 無理やり mdx が export している変数を取り出して collection のデータに追加
+		const rawBlogEntry = rawBlogEntries.find( ( rawBlogEntry ) =>
+			new RegExp( `${entry.id}$` ).test( rawBlogEntry.url || '' )
+		);
+		// @ts-ignore
+		const thumbnail = ( rawBlogEntry?.thumbnail as string ) || '';
+		acc[ entry.id ] = thumbnail;
+		return acc;
+
+	}, {} as { [key: string]: string });
+
+	return tags.map((tag) => {
+		const posts = blogEntries.filter( ( entry ) => {
+			return entry.data.tags.includes( tag );
+		});
+		posts.forEach( ( post ) => {
+			post.data.thumbnail = imageLookup[ post.id ];
+		});
+
+		return {
+			params: { tag },
+			props: { posts },
+		}
+	});
+}
+
+const { tag } = Astro.params;
+const { posts } = Astro.props;
+---
+
+<Layout title={ tag }>
+	<h1>{ tag }</h1>
+	{ posts.map((post) => (
+		<div>
+			<a href={ `/blog/${ post.slug }` }>
+				{ post.data.title }
+				<img src={ post.data.thumbnail } alt="" height="128" />
+			</a>
+		</div>
+	)) }
+</Layout>
